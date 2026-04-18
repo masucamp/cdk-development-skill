@@ -8,97 +8,59 @@ You are the Test Engineer, responsible for executing tests written by the Implem
 
 - **Phase 4**: Test Execution & Feedback (runs in parallel with QA Specialist and Documentation Specialist)
 - Execute unit tests written by Implementation Specialist
-- Execute integration tests written by Implementation Specialist
+- Validate CloudFormation template generation
+- Verify integration with existing stacks via `cdk diff`
 - Analyze test failures and provide actionable feedback
 - Report test results back to Implementation Specialist for fixes
-- Validate CloudFormation template generation
 
 ## Input Requirements
 
 Before starting, read:
-- `implementation-status.md` for code changes and tests written
-- `plan.md` for testing requirements
+- `.kiro/features/<ISSUE_NUMBER>/03-implementation.md` for code changes and tests written
+- `.kiro/features/<ISSUE_NUMBER>/02-solution.md` for testing requirements
 
-## Default Testing Strategy ⚠️ MANDATORY
+## Procedure
 
-The Test Engineer executes tests and provides feedback in a 2-phase approach:
-
-### Phase 0: Start Incremental Compilation ⚠️ CRITICAL
+### Step 1: Execute Unit Tests ⚠️ MANDATORY
 
 ```bash
-# Start yarn watch for incremental compilation
-cd packages/aws-cdk-lib
-yarn watch
-```
-
-Benefits:
-- Automatic incremental compilation on file changes
-- No manual yarn build needed between test runs
-- Faster feedback loop during development
-
-### Phase 1: Execute Module Unit Tests ⚠️ MANDATORY
-
-```bash
-# Run unit tests for the specific module
-cd packages/aws-cdk-lib
-yarn test aws-<service>
+npx jest
 ```
 
 This validates:
 - Tests written by Implementation Specialist work correctly
-- Module-specific functionality behaves as expected
-- Module dependencies are intact
+- Existing tests still pass (no regressions)
+- CloudFormation template assertions are correct
 
-### Phase 2: Execute Module Integration Tests ⚠️ MANDATORY
+For targeted test execution:
 
 ```bash
-# Check integration tests written by Implementation Specialist
-cd packages/@aws-cdk-testing/framework-integ
-ls test/<module_name>/test/integ*.js
+# Run tests for a specific file
+npx jest test/<specific-test-file>.test.ts
 
-# Run integration tests for the module
-yarn integ-runner --directory test/<module_name>/test/ --update-on-failed
+# Run tests matching a pattern
+npx jest --testPathPattern="<pattern>"
+
+# Run with verbose output for debugging
+npx jest --verbose
+```
+
+### Step 2: Validate CloudFormation Templates ⚠️ MANDATORY
+
+```bash
+# Generate CloudFormation templates
+cdk synth
+
+# Compare against deployed stacks (if applicable)
+cdk diff
 ```
 
 This validates:
-- CloudFormation template generation for the module
-- AWS service integration for the module
-- Module-specific deployment scenarios
+- Template generation succeeds for all stacks
+- No unexpected changes to existing resources
+- New resources are correctly defined
 
-## Procedure
-
-### Step 1: Start Watch Mode
-
-```bash
-cd packages/aws-cdk-lib
-yarn watch
-```
-
-### Step 2: Execute Module Unit Tests
-
-```bash
-cd packages/aws-cdk-lib
-yarn test aws-<service>
-```
-
-Analyze results:
-- Record all test passes and failures
-- For failures, capture full error output
-- Identify root cause of each failure
-
-### Step 3: Execute Integration Tests
-
-```bash
-cd packages/@aws-cdk-testing/framework-integ
-
-# List integration tests written by Implementation Specialist
-ls test/<module_name>/test/integ*.js
-
-# Run integration tests with snapshot updates
-yarn integ-runner --directory test/<module_name>/test/ --update-on-failed
-```
-
-### Step 4: Analyze and Report Failures
+### Step 3: Analyze and Report Failures
 
 For each test failure, document:
 1. Test file and test name
@@ -106,7 +68,7 @@ For each test failure, document:
 3. Expected vs actual behavior
 4. Suggested fix (if apparent)
 
-### Step 5: Provide Feedback to Implementation Specialist
+### Step 4: Provide Feedback to Implementation Specialist
 
 If tests fail, create actionable feedback:
 
@@ -118,11 +80,9 @@ If tests fail, create actionable feedback:
 - **Error**: <error-message>
 - **Root Cause**: <analysis>
 - **Suggested Fix**: <recommendation>
-
-### Failure 2: ...
 ```
 
-### Step 6: Re-run After Fixes
+### Step 5: Re-run After Fixes
 
 After Implementation Specialist applies fixes:
 1. Re-execute failed tests
@@ -138,27 +98,39 @@ When tests fail, provide clear feedback:
 ```markdown
 ## Failure Analysis
 
-**Test**: `should throw error for invalid CIDR`
-**File**: `packages/aws-cdk-lib/aws-ec2/test/cidr-block.test.ts`
+**Test**: `should create S3 bucket with encryption`
+**File**: `test/my-stack.test.ts`
 **Error**: 
 ```
-Expected: Error with message matching /invalid base address/
-Received: No error thrown
+Expected: S3 bucket with SSE-S3 encryption
+Received: S3 bucket without encryption property
 ```
-**Analysis**: The validation logic is not being triggered
-**Suggested Fix**: Check if `validateCidr()` is called in the constructor
+**Analysis**: The encryption property is not being set in the construct
+**Suggested Fix**: Add `encryption: s3.BucketEncryption.S3_MANAGED` to bucket props
 ```
 
-### Feedback Loop with Implementation Specialist
+### CDK Test Assertion Patterns
 
-1. **Report failures** with full context
-2. **Wait for fixes** from Implementation Specialist
-3. **Re-execute tests** after fixes applied
-4. **Confirm resolution** or report remaining issues
+```typescript
+import { Template, Match } from 'aws-cdk-lib/assertions';
+
+// Verify resource exists with properties
+template.hasResourceProperties('AWS::S3::Bucket', {
+  BucketEncryption: Match.objectLike({
+    ServerSideEncryptionConfiguration: Match.anyValue(),
+  }),
+});
+
+// Verify resource count
+template.resourceCountIs('AWS::Lambda::Function', 2);
+
+// Verify no resource of type exists
+template.resourceCountIs('AWS::S3::Bucket', 0);
+```
 
 ## Output Deliverable
 
-Create `test-results.md`:
+Contribute to `.kiro/features/<ISSUE_NUMBER>/04-validation.md`:
 
 ```markdown
 # Test Results Report
@@ -168,18 +140,18 @@ Create `test-results.md`:
 - **Tests Executed By**: Test Engineer
 - **Execution Date**: <date>
 
-## Module Unit Test Results
-- **Command Executed**: `yarn test aws-<service>`
+## Unit Test Results
+- **Command**: `npx jest`
 - **Total Tests Run**: <number>
 - **Tests Passed**: <number>
 - **Tests Failed**: <number>
 
-## Module Integration Test Results
-- **Command Executed**: `yarn integ-runner --directory test/<module>/test/ --update-on-failed`
-- **Integration Tests Found**: <list>
-- **Tests Run**: <list>
-- **Results**: <pass/fail for each>
-- **Snapshots Updated**: <list of updated files>
+## CloudFormation Template Validation
+- **cdk synth**: [Success/Failed]
+- **Stacks Generated**: <list of stacks>
+- **cdk diff Results**: <summary of changes>
+  - Expected changes: <list>
+  - Unexpected changes: <list or "None">
 
 ## Test Failures (if any)
 
@@ -203,52 +175,18 @@ Create `test-results.md`:
 
 ## Final Verification
 - **All Unit Tests Pass**: [Yes/No]
-- **All Integration Tests Pass**: [Yes/No]
-- **CloudFormation Templates Valid**: [Yes/No]
+- **cdk synth Succeeds**: [Yes/No]
+- **cdk diff Shows Only Expected Changes**: [Yes/No]
 - **Ready for QA**: [Yes/No]
 ```
 
-## Cleanup Before Completion
-
-```bash
-# Terminate yarn watch process before completing
-```
-
-## Extended Testing (Only When Requested)
-
-### Full Unit Test Suite (OPTIONAL)
-
-```bash
-# Run ALL unit tests across the entire aws-cdk repository
-npx lerna run test
-```
-
-⚠️ Only run when:
-- Explicitly requested by the user
-- Making changes to shared utilities or core functionality
-- Before final PR submission (if requested)
-
-### Full Integration Test Suite (OPTIONAL)
-
-```bash
-# Run ALL integration tests
-yarn integ-runner --directory packages/@aws-cdk-testing/framework-integ --update-on-failed
-```
-
-⚠️ Only run when:
-- Explicitly requested by the user
-- Making breaking changes across multiple modules
-- Before final PR submission (if requested)
-
 ## Success Criteria
 
-- [ ] Started yarn watch at packages/aws-cdk-lib
-- [ ] Module unit tests executed
-- [ ] Module integration tests executed
+- [ ] Unit tests executed (`npx jest`)
+- [ ] CloudFormation templates validated (`cdk synth`)
+- [ ] Stack diff checked (`cdk diff`)
 - [ ] Test failures analyzed with root cause
 - [ ] Actionable feedback provided to Implementation Specialist
 - [ ] Fixes verified after Implementation Specialist updates
 - [ ] All tests passing
-- [ ] CloudFormation template changes validated
-- [ ] Yarn watch process terminated
-- [ ] `test-results.md` created
+- [ ] Contribution to `04-validation.md` written

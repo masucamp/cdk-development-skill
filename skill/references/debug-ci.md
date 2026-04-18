@@ -1,40 +1,33 @@
-# Debugging CodeBuild CI Errors
+# Debugging CI Errors
 
-## Quick Commands
+## GitHub Actions
 
-### View last 100 lines of failed job
+### View failed workflow run logs
 ```bash
-gh run view <RUN_ID> --repo aws/aws-cdk --log --job <JOB_ID> | tail -100
+gh run list --limit 5
+gh run view <RUN_ID> --log-failed
 ```
 
-### Search for error markers (CDK uses `!!!!!!!!!!` to mark failures)
+### Search for error markers
 ```bash
-gh run view <RUN_ID> --repo aws/aws-cdk --log --job <JOB_ID> | grep -A 10 -B 10 "!!!!!!!!!!"
+gh run view <RUN_ID> --log | grep -i "error" | head -20
 ```
 
-### Search for generic errors
-```bash
-gh run view <RUN_ID> --repo aws/aws-cdk --log --job <JOB_ID> | grep -i "error"
-```
-
-## Example
-
-For run ID `20999722498` and job ID `60366124784`:
-
-```bash
-gh run view 20999722498 --repo aws/aws-cdk --log --job 60366124784 | grep -A 10 -B 10 "!!!!!!!!!!" | head -50
-```
-
-## Getting Run/Job IDs
+### Getting Run ID
 
 From the GitHub Actions URL:
 ```
-https://github.com/aws/aws-cdk/actions/runs/20999722498/job/60366124784
-                                                    ^^^^^^^^^       ^^^^^^^^^^^
-                                                    RUN_ID          JOB_ID
+https://github.com/<owner>/<repo>/actions/runs/12345678
+                                                ^^^^^^^^
+                                                RUN_ID
 ```
 
 Or list recent runs:
 ```bash
-gh run list --repo aws/aws-cdk --branch <BRANCH_NAME> --limit 5
+gh run list --branch <BRANCH_NAME> --limit 5
+```
+
+### Re-run failed jobs
+```bash
+gh run rerun <RUN_ID> --failed
 ```
